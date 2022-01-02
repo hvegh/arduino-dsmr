@@ -84,7 +84,7 @@ using MyData = ParsedData<
  *
  * For this reason, Printer::apply is a template, resulting in one
  * distinct apply method for each field used. This allows looking up
- * things like Item::name, which is different for every field type,
+ * things like Item::get_name(), which is different for every field type,
  * without having to resort to virtual method calls (which result in
  * extra storage usage). The tradeoff is here that there is more code
  * generated (but due to compiler inlining, it's pretty much the same as

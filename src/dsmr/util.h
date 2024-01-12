@@ -28,38 +28,33 @@
  * Various utility functions
  */
 
-#ifndef DSMR_INCLUDE_UTIL_H
-#define DSMR_INCLUDE_UTIL_H
-
-#ifdef ARDUINO_ARCH_ESP8266
-#define DSMR_PROGMEM
-#else
-#define DSMR_PROGMEM PROGMEM
-#endif
+#pragma once
 
 #include <Arduino.h>
 
-namespace dsmr {
+namespace dsmr
+{
 
-/**
+  /**
  * Small utility to get the length of an array at compiletime.
  */
-template<typename T, unsigned int sz>
-inline unsigned int lengthof(const T (&)[sz]) { return sz; }
+  template <typename T, unsigned int sz>
+  inline unsigned int lengthof(const T (&)[sz]) { return sz; }
 
-// Hack until https://github.com/arduino/Arduino/pull/1936 is merged.
-// This appends the given number of bytes from the given C string to the
-// given Arduino string, without requiring a trailing NUL.
-// Requires that there _is_ room for nul-termination
-static void concat_hack(String& s, const char *append, size_t n) {
-  // Add null termination. Inefficient, but it works...
-  char buf[n + 1];
-  memcpy(buf, append, n);
-  buf[n] = 0;
-  s.concat(buf);
-}
+  // Hack until https://github.com/arduino/Arduino/pull/1936 is merged.
+  // This appends the given number of bytes from the given C string to the
+  // given Arduino string, without requiring a trailing NUL.
+  // Requires that there _is_ room for nul-termination
+  static void concat_hack(String &s, const char *append, size_t n)
+  {
+    // Add null termination. Inefficient, but it works...
+    char buf[n + 1];
+    memcpy(buf, append, n);
+    buf[n] = 0;
+    s.concat(buf);
+  }
 
-/**
+  /**
  * The ParseResult<T> class wraps the result of a parse function. The type
  * of the result is passed as a template parameter and can be void to
  * not return any result.
@@ -89,98 +84,172 @@ static void concat_hack(String& s, const char *append, size_t n) {
  * probably way longer that needed.
  */
 
-// Superclass for ParseResult so we can specialize for void without
-// having to duplicate all content
-template <typename P, typename T>
-struct _ParseResult {
-  T result;
+  enum Error : uint8_t {
+      na,
+      duplicate_field,
+      missing_opening_bracket,
+      missing_closing_bracket,
+      invalid_string_length,
+      invalid_number,
+      missing_unit,
+      invalid_unit,
+      extra_data,
+      no_checksum_found,
+      obis_id_over_255,
+      obis_id_empty,
+      incomplete_or_malformed_checksum,
+      data_should_start_with_slash,
+      checksum_mismatch,
+      invalid_id_string,
+      last_dataline_not_crlf_terminated,
+      trailing_char_on_data_line,
+      unknown_field
+  };
 
-  P& succeed(T& result) {
-    this->result = result; return *static_cast<P*>(this);
-  }
-  P& succeed(T&& result) {
-    this->result = result;
-    return *static_cast<P*>(this);
-  }
-};
+  // Superclass for ParseResult so we can specialize for void without
+  // having to duplicate all content
+  template <typename P, typename T>
+  struct _ParseResult
+  {
+    T result;
 
-// partial specialization for void result
-template <typename P>
-struct _ParseResult<P, void> {
-};
+    P &succeed(T &result)
+    {
+      this->result = result;
+      return *static_cast<P *>(this);
+    }
+    P &succeed(T &&result)
+    {
+      this->result = result;
+      return *static_cast<P *>(this);
+    }
+  };
 
-// Actual ParseResult class
-template <typename T>
-struct ParseResult : public _ParseResult<ParseResult<T>, T> {
-  const char *next = NULL;
-  const __FlashStringHelper *err = NULL;
-  const char *ctx = NULL;
+  // partial specialization for void result
+  template <typename P>
+  struct _ParseResult<P, void>
+  {
+  };
 
-  ParseResult& fail(const __FlashStringHelper *err, const char* ctx = NULL) {
-    this->err = err;
-    this->ctx = ctx;
-    return *this;
-  }
-  ParseResult& until(const char *next) {
-    this->next = next;
-    return *this;
-  }
-  ParseResult() = default;
-  ParseResult(const ParseResult& other) = default;
+  // Actual ParseResult class
+  template <typename T>
+  struct ParseResult : public _ParseResult<ParseResult<T>, T>
+  {
+    const char *next = NULL;
+    Error err = Error::na;
+    const char *ctx = NULL;
 
-  template <typename T2>
-  ParseResult(const ParseResult<T2>& other): next(other.next), err(other.err), ctx(other.ctx) { }
+    static const __FlashStringHelper *ToErrString(Error err) {
+        switch(err) {
+            case Error::duplicate_field:
+                return F("Duplicate field");
+            case Error::missing_opening_bracket:
+                return F("Missing (");
+            case Error::missing_closing_bracket:
+                return F("Missing )");
+            case Error::invalid_string_length:
+                return F("Invalid string length");
+            case Error::invalid_number:
+                return F("Invalid number");
+            case Error::missing_unit:
+                return F("Missing unit");
+            case Error::invalid_unit:
+                return F("Invalid unit");
+            case Error::extra_data:
+                return F("Extra data");
+            case Error::no_checksum_found:
+                return F("No checksum found");
+            case Error::obis_id_over_255:
+                return F("Obis ID has number over 255");
+            case Error::obis_id_empty:
+                return F("OBIS id Empty");
+            case Error::incomplete_or_malformed_checksum:
+                return F("Incomplete or malformed checksum");
+            case Error::data_should_start_with_slash:
+                return F("Data should start with /");
+            case Error::checksum_mismatch:
+                return F("Checksum mismatch");
+            case Error::invalid_id_string:
+                return F("Invalid identification string");
+            case Error::last_dataline_not_crlf_terminated:
+                return F("Last dataline not CRLF terminated");
+            case Error::trailing_char_on_data_line:
+                return F("Trailing characters on data line");
+            case Error::unknown_field:
+                return F("Unknown field");
+            default:
+                return F("?");
+        }
+    }
 
-  /**
+    ParseResult &fail(Error err, const char *ctx = NULL)
+    {
+      this->err = err;
+      this->ctx = ctx;
+      return *this;
+    }
+    ParseResult &until(const char *next)
+    {
+      this->next = next;
+      return *this;
+    }
+    ParseResult() = default;
+    ParseResult(const ParseResult &other) = default;
+
+    template <typename T2>
+    ParseResult(const ParseResult<T2> &other) : next(other.next), err(other.err), ctx(other.ctx) {}
+
+    /**
    * Returns the error, including context in a fancy multi-line format.
    * The start and end passed are the first and one-past-the-end
    * characters in the total parsed string. These are needed to properly
    * limit the context output.
    */
-  String fullError(const char* start, const char* end) const {
-    String res;
-    if (this->ctx && start && end) {
-      // Find the entire line surrounding the context
-      const char *line_end = this->ctx;
-      while(line_end < end && line_end[0] != '\r' && line_end[0] != '\n') ++line_end;
-      const char *line_start = this->ctx;
-      while(line_start > start && line_start[-1] != '\r' && line_start[-1] != '\n') --line_start;
+    String fullError(const char *start, const char *end) const
+    {
+      String res;
+      if (this->ctx && start && end)
+      {
+        // Find the entire line surrounding the context
+        const char *line_end = this->ctx;
+        while (line_end < end && line_end[0] != '\r' && line_end[0] != '\n')
+          ++line_end;
+        const char *line_start = this->ctx;
+        while (line_start > start && line_start[-1] != '\r' && line_start[-1] != '\n')
+          --line_start;
 
-      // We can now predict the context string length, so let String allocate
-      // memory in advance
-      res.reserve((line_end - line_start) + 2 + (this->ctx - line_start) + 1 + 2);
+        // We can now predict the context string length, so let String allocate
+        // memory in advance
+        res.reserve((line_end - line_start) + 2 + (this->ctx - line_start) + 1 + 2);
 
-      // Write the line
-      concat_hack(res, line_start, line_end - line_start);
-      res += "\r\n";
+        // Write the line
+        concat_hack(res, line_start, line_end - line_start);
+        res += "\r\n";
 
-      // Write a marker to point out ctx
-      while (line_start++ < this->ctx)
-        res += ' ';
-      res += '^';
-      res += "\r\n";
+        // Write a marker to point out ctx
+        while (line_start++ < this->ctx)
+          res += ' ';
+        res += '^';
+        res += "\r\n";
+      }
+      res += ToErrString(this->err);
+      return res;
     }
-    res += this->err;
-    return res;
-  }
-};
+  };
 
-/**
+  /**
  * An OBIS id is 6 bytes, usually noted as a-b:c.d.e.f. Here we put them
  * in an array for easy parsing.
  */
-struct ObisId {
-  uint8_t v[6];
+  struct ObisId
+  {
+    uint8_t v[6];
 
-  constexpr ObisId(uint8_t a, uint8_t b = 255, uint8_t c = 255, uint8_t d = 255, uint8_t e = 255, uint8_t f = 255)
-    : v{a, b, c, d, e, f} { };
-  constexpr ObisId() : v() {} // Zeroes
+    constexpr ObisId(uint8_t a, uint8_t b = 255, uint8_t c = 255, uint8_t d = 255, uint8_t e = 255, uint8_t f = 255)
+        : v{a, b, c, d, e, f} {};
+    constexpr ObisId() : v() {} // Zeroes
 
-  bool operator==(const ObisId &other) const {
-    return memcmp(&v, &other.v, sizeof(v)) == 0;
-  }
-};
+    bool operator==(const ObisId &other) const { return memcmp(&v, &other.v, sizeof(v)) == 0; }
+  };
 
 } // namespace dsmr
-
-#endif // DSMR_INCLUDE_UTIL_H

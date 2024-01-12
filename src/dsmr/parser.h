@@ -194,23 +194,6 @@ namespace dsmr
       {
         ++num_end;
 
-<<<<<<< HEAD
-    // If a unit was passed, check that the unit in the messages
-    // messages the unit passed.
-    if (unit && *unit) {
-      if (num_end >= end || *num_end != '*')
-        return res.fail(F("Missing unit"), num_end);
-      const char *unit_start = ++num_end; // skip *
-      while(num_end < end && *num_end != ')' && *unit) {
-        // Next character in units do not match?
-        if (*num_end++ != *unit++)
-          return res.fail((const __FlashStringHelper*)INVALID_UNIT, unit_start);
-      }
-      // At the end of the message unit, but not the passed unit?
-      if (*unit)
-        return res.fail((const __FlashStringHelper*)INVALID_UNIT, unit_start);
-    }
-=======
         while (num_end < end && !strchr("*)", *num_end) && max_decimals--)
         {
           if (*num_end < '0' || *num_end > '9')
@@ -220,7 +203,6 @@ namespace dsmr
           ++num_end;
         }
       }
->>>>>>> jputcu-master
 
       // Fill in missing decimals with zeroes
       while (max_decimals--)
@@ -402,32 +384,6 @@ namespace dsmr
       // Split into lines and parse those
       const char *line_end = str, *line_start = str;
 
-<<<<<<< HEAD
-    // Parse ID line
-    while (line_end < end) {
-      if (*line_end == '\r' || *line_end == '\n') {
-        // The first identification line looks like:
-        // XXX5<id string>
-        // The DSMR spec is vague on details, but in 62056-21, the X's
-        // are a three-letter (registerd) manufacturer ID, the id
-        // string is up to 16 chars of arbitrary characters and the
-        // '5' is a baud rate indication. 5 apparently means 9600,
-        // which DSMR 3.x and below used. It seems that DSMR 2.x
-        // passed '3' here (which is mandatory for "mode D"
-        // communication according to 62956-21), so we also allow
-        // that. Apparently swedish meters use '9' for 115200. This code
-        // used to check the format of the line somewhat, but for
-        // flexibility (and since we do not actually parse the contents
-        // of the line anyway), just allow anything now.
-        //
-        // Offer it for processing using the all-ones Obis ID, which
-        // is not otherwise valid.
-        ParseResult<void> tmp = data->parse_line(ObisId(255, 255, 255, 255, 255, 255), line_start, line_end);
-        if (tmp.err)
-          return tmp;
-        line_start = ++line_end;
-        break;
-=======
       // Parse ID line
       while (line_end < end)
       {
@@ -454,7 +410,6 @@ namespace dsmr
           break;
         }
         ++line_end;
->>>>>>> jputcu-master
       }
 
       // Parse data lines
